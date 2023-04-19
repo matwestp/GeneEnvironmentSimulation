@@ -6,13 +6,17 @@ cd "C:\Users\Win7ADM\Documents\GitHub\GeneEnvironmentSimulation"
 clear 
 set obs 10000
 
-mat C = 1,-.0\-.0,1
-
+**# Generate Variables
+// Unobserved heterogeneity
+loc corr =-.2
+mat C = 1,`corr' \ `corr',1
 drawnorm eps0 eps1, corr(C)
 
+//Potential Outcomes 
 gen Y1 =.2*eps1
 gen Y0 =.2*eps0
 
+//Instrument
 gen Z =rnormal()>0
 
 //Environment (Education); the Treatment
@@ -20,37 +24,51 @@ gen D0 =(Y1-Y0)>0
 gen D1 =(Y1-Y0)>1
 gen D =D0 +Z*(D1-D0)
 
+//Define Compliers
 gen comp =(D0==1)*(D1==0)
-gen ITE =Y1-Y0 
-su ITE if D==1
+
 //Endowment (Genes)
 gen G =eps0>0
+
+gen ITE =Y1-Y0 
+su ITE if D==1
+loc ATT_true = `r(mean)'
 
 bys G: su ITE if D==1
 
 bys G: su comp 
 
-
+//Observation rule 
 gen Y =Y0 +D*(Y1-Y0)
+// OLS is biased because cov(eps0,D)!=0
+// IV is unbiased because cov(eps0,Z)==0
+*********************************************************************
 
-reg Y D 
+**# Analyzing Variables 
 
-di "aUtO"
 
 qui{
-reg Y 1.D#i.G
-loc ATT_G0 =_b[1.D#0.G]
-loc ATT_G1 =_b[1.D#1.G]
+*reg Y 1.D#i.G
+// loc ATT_G0 =_b[1.D#0.G]
+// loc ATT_G1 =_b[1.D#1.G]
+ivregress 2sls Y (D=Z)  if G==0
+loc ATT_G0 =_b[D]
+ivregress 2sls Y (D=Z) if G==1
+loc ATT_G1 =_b[D]
 
 su G if D==1 
 loc Gmean =`r(mean)'
 
 reg Y D 
+ivregress 2sls Y (D=Z) 
 loc ATT =_b[D]
 noi di "Gewichter ATT: " _col(20) `ATT_G0'*(1-`Gmean')+`ATT_G1'*`Gmean'
 noi di "ATT:" _col(20) `ATT'
+noi di "True ATT:" _col(20) `ATT_true'
+noi di "Note: in this ATT, two mechanisms operate: 1. effects on complying probability. 2. Effect on outcomes conditional on complying probability"
 }
 
+exit
 
 gen V =ITE 
 la var V "unobserved gains"
@@ -86,7 +104,10 @@ lpoly comp U_D if G==1, gen(wLATE1) at(eval)
 la var wLATE0 "{&omega}{sub:LATE}, G=0"
 la var wLATE1 "{&omega}{sub:LATE}, G=1"
 
-tw (li MTE1 eval, lc(blue)) (li MTE0 eval, lc(red)) (li wLATE1 eval, lp(dash) yaxis(2) lc(blue)) (li wLATE0 eval, lp(dash) yaxis(2) lc(red)) (li LATE1 LATE0 eval, lw(1 =) lc(blue red)) , plotr(lc(none)) legend() ytitle("Weight", axis(2)) ytitle("Effect")
+la var eval "U{sub:D}"
+
+tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lc(blue red)) , plotr(lc(none)) legend() ytitle("Weight", axis(2)) ytitle("Effect")
+
 gen dMTE =MTE1 - MTE0 
 su dMTE
 
