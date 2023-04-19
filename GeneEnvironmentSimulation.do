@@ -69,16 +69,16 @@ reg Y D
 
 su V if D==1
 
-
+********************************************************************************
 
 *synchronize file (cd muss immer lokal auf den github ordner eingestellt sein)
 file close _all
 file open git using mygit.bat, write replace 
 file write git "git remote add origin " `"""' "hhttps://github.com/matwestp/GeneEnvironmentSimulation.git" `"""' _n
- file write git "git add --all" _n
- file write git "git commit -m "
- file write git `"""' "change" `"""' _n 			// choose name for change 
- file write git "git push" _n
+file write git "git add --all" _n
+file write git "git commit -m "
+file write git `"""' "change" `"""' _n 			// choose name for change 
+file write git "git push" _n
 file close git
 
 ! mygit.bat
