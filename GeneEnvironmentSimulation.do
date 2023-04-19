@@ -35,6 +35,7 @@ gen Y =Y0 +D*(Y1-Y0)
 
 reg Y D 
 
+di "aUtO"
 
 qui{
 reg Y 1.D#i.G
