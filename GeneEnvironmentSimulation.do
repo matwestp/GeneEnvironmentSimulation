@@ -59,12 +59,41 @@ foreach g of numlist 0 1{
 	su V if G==`g'
 	replace U_D =normal(-(V-`r(mean)')/`r(sd)') if G==`g'
 	su ITE if D==1 &G==`g'
-	loc mATT`g' =`r(mean)'
+	glo mATT`g' =`r(mean)'
+	su comp if G==`g'
+	glo comp`g' =`r(mean)'
 }
 
-tw (lpoly V U_D if G==1, lc(blue)) (lpoly V U_D if G==0, lc(red)) (lpoly comp U_D if G==1, lp(dash) yaxis(2) lc(blue)) (lpoly comp U_D if G==0, lp(dash) yaxis(2) lc(red)), yline(`mATT1' `mATT0', lc(blue red))
 
+
+gen eval =_n/100 if _n<=100 
+
+lpoly V U_D if G==1, gen(MTE1) at(eval)
+lpoly V U_D if G==0, gen(MTE0) at(eval)
+
+la var MTE1 "MTE, G=1" 
+la var MTE0 "MTE, G=0"
+
+gen LATE1 =$mATT1 if !mi(eval) &eval<=$comp1
+gen LATE0 =$mATT0 if !mi(eval) &eval<=$comp0
+
+la var LATE1 "LATE, G=1"
+la var LATE0 "LATE, G=0"
+
+lpoly comp U_D if G==0, gen(wLATE0) at(eval)
+lpoly comp U_D if G==1, gen(wLATE1) at(eval)
+
+la var wLATE0 "{&omega}{sub:LATE}, G=0"
+la var wLATE1 "{&omega}{sub:LATE}, G=1"
+
+tw (li MTE1 eval, lc(blue)) (li MTE0 eval, lc(red)) (li wLATE1 eval, lp(dash) yaxis(2) lc(blue)) (li wLATE0 eval, lp(dash) yaxis(2) lc(red)) (li LATE1 LATE0 eval, lw(1 =) lc(blue red)) , plotr(lc(none)) legend() ytitle("Weight", axis(2)) ytitle("Effect")
+gen dMTE =MTE1 - MTE0 
+su dMTE
+
+di  $mATT1 - $mATT0
 bys G: ivregress 2sls Y (D=Z) 
+
+
 reg Y D 
 
 su V if D==1
