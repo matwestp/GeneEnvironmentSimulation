@@ -20,18 +20,21 @@ gen Y0 =.2*eps0
 gen Z =rnormal()>0
 
 //Environment (Education); the Treatment
-gen D0 =(Y1-Y0)>0
-gen D1 =(Y1-Y0)>1
-gen D =D0 +Z*(D1-D0)
+gen D0 	=(Y1-Y0)>0
+gen D1 	=(Y1-Y0)>1
+gen D 	=D0 +Z*(D1-D0)
 
 //Define Compliers
 gen comp =(D0==1)*(D1==0)
 
 //Endowment (Genes)
-gen G =eps0>0
+gen 	G =eps0<0
+la var 	G "Advantageous genetic environment"
+
+bys G: su eps0 if D==1
 
 gen ITE =Y1-Y0 
-su ITE if D==1
+su 	ITE if D==1
 loc ATT_true = `r(mean)'
 
 bys G: su ITE if D==1
@@ -65,11 +68,14 @@ loc ATT =_b[D]
 noi di "Gewichter ATT: " _col(20) `ATT_G0'*(1-`Gmean')+`ATT_G1'*`Gmean'
 noi di "ATT:" _col(20) `ATT'
 noi di "True ATT:" _col(20) `ATT_true'
-noi di "Note: in this ATT, two mechanisms operate: 1. effects on complying probability. 2. Effect on outcomes conditional on complying probability"
+noi di _n(1) "Note: in this ATT, two mechanisms operate:"
+noi di _col(5) "1. effects on complying probability." 
+noi di _col(5) "2. Effect on outcomes conditional on complying probability"
+noi di _n(1) _col(3) "==> Now we will decompose both effects..."
 }
 
-exit
 
+qui{
 gen V =ITE 
 la var V "unobserved gains"
 gen U_D =. 
@@ -81,13 +87,16 @@ foreach g of numlist 0 1{
 	su comp if G==`g'
 	glo comp`g' =`r(mean)'
 }
+noi di "1. Difference in complying probability is:"
+noi di _col(5) abs($comp1-$comp0)
+}
 
-
+**# Efefct decomposition
 
 gen eval =_n/100 if _n<=100 
 
-lpoly V U_D if G==1, gen(MTE1) at(eval)
-lpoly V U_D if G==0, gen(MTE0) at(eval)
+lpoly V U_D if G==1, gen(MTE1) at(eval) nogr
+lpoly V U_D if G==0, gen(MTE0) at(eval) nogr
 
 la var MTE1 "MTE, G=1" 
 la var MTE0 "MTE, G=0"
@@ -98,19 +107,21 @@ gen LATE0 =$mATT0 if !mi(eval) &eval<=$comp0
 la var LATE1 "LATE, G=1"
 la var LATE0 "LATE, G=0"
 
-lpoly comp U_D if G==0, gen(wLATE0) at(eval)
-lpoly comp U_D if G==1, gen(wLATE1) at(eval)
+lpoly comp U_D if G==0, gen(wLATE0) at(eval) nogr
+lpoly comp U_D if G==1, gen(wLATE1) at(eval) nogr
 
 la var wLATE0 "{&omega}{sub:LATE}, G=0"
 la var wLATE1 "{&omega}{sub:LATE}, G=1"
 
 la var eval "U{sub:D}"
 
-tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lc(blue red)) , plotr(lc(none)) legend() ytitle("Weight", axis(2)) ytitle("Effect")
+tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lp(dot =) lc(blue red)) , plotr(lc(none)) legend() ytitle("Weight", axis(2)) ytitle("Effect")
+gr export "Simulation_results.pdf", replace 
 
 gen dMTE =MTE1 - MTE0 
 su dMTE
-
+glo outcome_effect =`r(mean)'
+noi di "Outcome effect: "$outcome_effect
 di  $mATT1 - $mATT0
 bys G: ivregress 2sls Y (D=Z) 
 
