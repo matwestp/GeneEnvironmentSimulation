@@ -103,9 +103,14 @@ foreach varU of numlist .2 1{
 
 	la var MTE1 "MTE, G=1" 
 	la var MTE0 "MTE, G=0"
-
-	gen LATE1 =$mATT1 if !mi(eval) &eval<=$comp1
-	gen LATE0 =$mATT0 if !mi(eval) &eval<=$comp0
+    
+	*Always Taker 
+	su D if Z==0 &D==1 &G==1
+	glo AT1 =`r(mean)'
+	su D if Z==0 &D==1 &G==0
+	glo AT0 =`r(mean)'
+	gen LATE1 =$mATT1 if !mi(eval) &inrange(eval,$AT1,$comp1+$AT1)
+	gen LATE0 =$mATT0 if !mi(eval) &inrange(eval,$AT0,$comp0+$AT0)
 
 	la var LATE1 "LATE, G=1"
 	la var LATE0 "LATE, G=0"
