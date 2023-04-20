@@ -105,11 +105,7 @@ foreach varU of numlist .2 1{
 	la var MTE0 "MTE, G=0"
     
 	
-	gen LATE1 =$mATT1 if !mi(eval) &wLATE1>0
-	gen LATE0 =$mATT0 if !mi(eval) &wLATE0>0
-	
-	la var LATE1 "LATE, G=1"
-	la var LATE0 "LATE, G=0"
+
 
 	lpoly comp U_D if G==0, gen(wLATE0) at(eval) nogr
 	lpoly comp U_D if G==1, gen(wLATE1) at(eval) nogr
@@ -117,16 +113,26 @@ foreach varU of numlist .2 1{
 	la var wLATE0 "{&omega}{sub:LATE}, G=0"
 	la var wLATE1 "{&omega}{sub:LATE}, G=1"
 
+	gen LATE1 =$mATT1 if !mi(eval) &wLATE1>0
+	gen LATE0 =$mATT0 if !mi(eval) &wLATE0>0
+	
+	la var LATE1 "LATE, G=1"
+	la var LATE0 "LATE, G=0"
+	
 	la var eval "U{sub:D}"
 	gen MTElab ="True Outcome Effect" if _n==50
 	replace MTElab ="IV estimate of Outcome Effect" if _n==10 
 	gen eval1 =eval if inlist(_n,10,50)
 	gen mean =(MTE1+MTE0)/2 if _n==50
-	replace mean =(LATE1+LATE0)/2 if _n==10
+	su LATE1
+	loc LATE1 =`r(mean)'
+	su LATE0
+	loc LATE0 =`r(mean)'
+	replace mean =(`LATE1'+`LATE0')/2 if _n==10
 	gen effect1 =MTE1 if _n==50 
-	replace effect1 =LATE1 if _n==10
+	replace effect1 =`LATE1' if _n==10
 	gen effect0 =MTE0 if _n==50
-	replace effect0 =LATE0 if _n==10
+	replace effect0 =`LATE0' if _n==10
 
 	tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lp(dot =) lc(blue red)) (rcap effect? eval1, mlab(MTElab)) (sc mean eval1, mlab(MTElab) msize(0)), plotr(lc(none)) legend( order(1 2 3 4 7 8)) ytitle("Weight", axis(2)) ytitle("Effect")
 	gr export "Simulation_results_`=`varU'*10'.pdf", replace 
@@ -145,7 +151,7 @@ su V if D==1
 
 ********************************************************************************
 
-*synchronize file (cd muss immer lokal auf den github ordner eingestellt sein)
+*save file online on github (cd muss immer lokal auf den github ordner eingestellt sein)
 file close _all
 file open git using mygit.bat, write replace 
 file write git "git remote add origin " `"""' "hhttps://github.com/matwestp/GeneEnvironmentSimulation.git" `"""' _n
