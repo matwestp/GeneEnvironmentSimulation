@@ -114,8 +114,13 @@ la var wLATE0 "{&omega}{sub:LATE}, G=0"
 la var wLATE1 "{&omega}{sub:LATE}, G=1"
 
 la var eval "U{sub:D}"
+gen MTElab ="True Outcome Effect" if _n==50
+replace MTElab ="IV estimate of Outcome Effect" if _n==10 
+gen eval1 =eval if inlist(_n,10,50)
+gen mean =(MTE1+MTE0)/2 if _n==50
+replace mean =(LATE1+LATE0)/2 if _n==10
 
-tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lp(dot =) lc(blue red)) , plotr(lc(none)) legend() ytitle("Weight", axis(2)) ytitle("Effect")
+tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lp(dot =) lc(blue red)) (rcap MTE1 MTE0 eval1, mlab(MTElab)) (sc mean eval1, mlab(MTElab) msize(0)), plotr(lc(none)) legend( order(1 2 3 4 6 7)) ytitle("Weight", axis(2)) ytitle("Effect")
 gr export "Simulation_results.pdf", replace 
 
 gen dMTE =MTE1 - MTE0 
