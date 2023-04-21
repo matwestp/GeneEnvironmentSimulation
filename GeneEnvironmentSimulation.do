@@ -9,25 +9,25 @@ foreach varU of numlist .2 1{
 
 	**# Generate Variables
 	// Unobserved heterogeneity
-	loc corr =-.2
+	loc corr =.4
 	mat C = 1,`corr' \ `corr',1
 	drawnorm eps0 eps1, corr(C)
 
 	//Endowment (Genes)
-	gen 	G =eps0<0
+	gen 	G =eps0>0 								// Leute mit positiven (unbeobachteten) Y-Werten haben gute Gene corr(eps0,eps1)>0
 	la var 	G "Advantageous genetic environment"
 
 	
 	//Potential Outcomes 
-	gen Y1 =`varU'*eps1
-	gen Y0 =`varU'*eps0
+	gen Y1 =.05*G 	+ eps1
+	gen Y0 =  0*G 	+ eps0
 
 	//Instrument
 	gen Z =rnormal()>0
 
 	//Environment (Education); the Treatment
-	gen D0 	=(Y1-Y0)>0
-	gen D1 	=(Y1-Y0)>1
+	gen D0 	=(Y1-Y0)+.3*G >0
+	gen D1 	=(Y1-Y0)+.3*G >(`varU'*1)
 	gen D 	=D0 +Z*(D1-D0)
 
 	//Define Compliers
@@ -45,7 +45,7 @@ foreach varU of numlist .2 1{
 	bys G: su comp 
 
 	//Observation rule 
-	gen Y =Y0 +D*(Y1-Y0) +3*G
+	gen Y =Y0 +D*(Y1-Y0) +0*G
 	// OLS is biased because cov(eps0,D)!=0
 	// IV is unbiased because cov(eps0,Z)==0
 	*********************************************************************
@@ -134,7 +134,7 @@ foreach varU of numlist .2 1{
 	gen effect0 =MTE0 if _n==50
 	replace effect0 =`LATE0' if _n==10
 
-	tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lp(dot =) lc(blue red)) (rcap effect? eval1, mlab(MTElab)) (sc mean eval1, mlab(MTElab) msize(0)), plotr(lc(none)) legend( order(1 2 3 4 7 8)) ytitle("Weight", axis(2)) ytitle("Effect")
+	tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lp(dot =) lc(blue red)) (rcap effect? eval1, mlab(MTElab)) (sc mean eval1, mlab(MTElab) msize(0)), plotr(lc(none)) legend( order(1 3 7 2 4 8) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") title("{&sigma}{sub:U}=`varU'")
 	gr export "Simulation_results_`=`varU'*10'.pdf", replace 
 
 	gen dMTE =MTE1 - MTE0 
@@ -145,6 +145,9 @@ foreach varU of numlist .2 1{
 	bys G: ivregress 2sls Y (D=Z) 
 }
 
+grc1leg Gr2 Gr10, name(combined, replace) ycommon
+gr di combined, ysize(3) xsize(6) scale(1.2)
+gr export "Simulation_results.pdf", replace 
 reg Y D 
 
 su V if D==1
@@ -154,6 +157,7 @@ su V if D==1
 *save file online on github (cd muss immer lokal auf den github ordner eingestellt sein)
 file close _all
 file open git using mygit.bat, write replace 
+file write git config --global user.name Matthias Westphal
 file write git "git remote add origin " `"""' "hhttps://github.com/matwestp/GeneEnvironmentSimulation.git" `"""' _n
 file write git "git add --all" _n
 file write git "git commit -m "
