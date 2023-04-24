@@ -71,12 +71,12 @@ qui foreach varU of numlist 4{
 	gen DG1 =D*G
 	ivregress 2sls Y (D=Z) if G==0
 	loc Z0 =_b[D]
+	
 	gen DG0 =D*(G==0)
-
 	ivregress 2sls DG0 (D=Z)
-	loc DG0 =_b[D]
+	loc weightG0 =_b[D]
 
-	loc weightedLATE `Z1'*(1-`DG0')+`Z0'*(`DG0')
+	loc weightedLATE `Z1'*(1-`weightG0')+`Z0'*(`weightG0')
 	
 	ivregress 2sls Y (D=Z) 
 	loc LATE =_b[D]
@@ -103,10 +103,28 @@ qui foreach varU of numlist 4{
 		glo comp`g' =`r(mean)'
 	}
 	}
-
+	
 	**# Efefct decomposition
 
 	gen eval =_n/100 if _n<=100 
+	
+	qui{ // Estimate the weights. Theorem IV weights (Loken, Mogstad, Wiswall, 2012 AEJ:Applied)
+			cap drop wG? 
+		foreach g of numlist 0 1{
+			gen wG`g' =. 
+			foreach num of numlist .05(.05).95{
+				di `num'
+					cap drop DUD`=floor(`num'*100)'
+				gen DUD`=floor(`num'*100)' = D*inrange(U_D,`=`num'-.025',`=`num'+.025')
+
+				cap ivregress 2sls DUD`=floor(`num'*100)' (D=Z) if G==`g'
+				di "`num': "_b[D]
+				if  _rc==0 	replace wG`g' =_b[D] 	if inrange(eval,`num'-.001,`num'+.001)
+				else 		replace wG`g' =0 		if inrange(eval,`num'-.001,`num'+.001)
+			}
+		}
+	}	
+
 
 	lpoly V U_D if G==1, gen(MTE1) at(eval) nogr
 	lpoly V U_D if G==0, gen(MTE0) at(eval) nogr
@@ -158,7 +176,10 @@ qui foreach varU of numlist 4{
 	replace effect1 =`LATE1' if _n==`evalmean'
 	gen effect0 =MTE0 if _n==`ev2'
 	replace effect0 =`LATE0' if _n==`evalmean'
-
+	
+	tw (li wG0 eval) (li wLATE0 eval, yaxis(2))
+	tw (li wG1 eval) (li wLATE1 eval, yaxis(2))
+	
 	tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lp(dot =) lc(blue red)) (rcap effect? eval1, mlab(MTElab)) (sc mean eval1, mlab(MTElab) msize(0)), plotr(lc(none)) legend( order(1 3 7 2 4 8) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") /*title("{&sigma}{sub:U}=`varU'")*/
 	gr export "Simulation_results_`=`varU'*10'.pdf", replace 
 	
