@@ -3,9 +3,10 @@
 cd "C:\Users\Win7ADM\Documents\GitHub\GeneEnvironmentSimulation"
 
 *******************************************************************************
-foreach varU of numlist .2 1{
+qui foreach varU of numlist 4{
+// 	local varU =1
 	clear 
-	set obs 10000
+	set obs 100000
 
 	**# Generate Variables
 	// Unobserved heterogeneity
@@ -19,15 +20,20 @@ foreach varU of numlist .2 1{
 
 	
 	//Potential Outcomes 
-	gen Y1 =.05*G 	+ eps1
-	gen Y0 =  0*G 	+ eps0
+	local ATE_D_G0				=.3
+	local ATE_D_interaction 	=1.5
+	local ATE_G_D0				=.5
+	local intercept				=0 
+	
+	gen Y1 =(`intercept' +`ATE_D_G0') 	+(`ATE_G_D0'+`ATE_D_interaction')*G + eps1
+	gen Y0 =`intercept' + 				  `ATE_G_D0'*G 						+ eps0
 
 	//Instrument
 	gen Z =rnormal()>0
 
 	//Environment (Education); the Treatment
-	gen D0 	=(Y1-Y0)+.3*G >0
-	gen D1 	=(Y1-Y0)+.3*G >(`varU'*1)
+	gen D0 	=(Y1-Y0)-.53+1*G >0
+	gen D1 	=(Y1-Y0)-.53+1*G >(`varU'*(1-.75*G))
 	gen D 	=D0 +Z*(D1-D0)
 
 	//Define Compliers
@@ -37,8 +43,8 @@ foreach varU of numlist .2 1{
 	bys G: su eps0 if D==1
 
 	gen ITE =Y1-Y0 
-	su 	ITE if D==1
-	loc ATT_true = `r(mean)'
+	su 	ITE if D==1 & comp==1
+	loc LATE_true = `r(mean)'
 
 	bys G: su ITE if D==1
 
@@ -53,27 +59,33 @@ foreach varU of numlist .2 1{
 	**# Analyzing Variables 
 
 
-	qui{
-	*reg Y 1.D#i.G
-	// loc ATT_G0 =_b[1.D#0.G]
-	// loc ATT_G1 =_b[1.D#1.G]
+	qui{ // Theorem IV weights (Loken, Mogstad, Wiswall, 2012 AEJ:Applied)
 	ivregress 2sls Y (D=Z)  if G==0
-	loc ATT_G0 =_b[D]
+	loc LATE_G0 =_b[D]
 	ivregress 2sls Y (D=Z) if G==1
-	loc ATT_G1 =_b[D]
+	loc LATE_G1 =_b[D]
 
-	su G if D==1 
-	loc Gmean =`r(mean)'
+	ivregress 2sls Y (D=Z) if G==1
+	loc Z1 =_b[D]
+		cap drop DG?
+	gen DG1 =D*G
+	ivregress 2sls Y (D=Z) if G==0
+	loc Z0 =_b[D]
+	gen DG0 =D*(G==0)
 
-	reg Y D 
+	ivregress 2sls DG0 (D=Z)
+	loc DG0 =_b[D]
+
+	loc weightedLATE `Z1'*(1-`DG0')+`Z0'*(`DG0')
+	
 	ivregress 2sls Y (D=Z) 
-	loc ATT =_b[D]
-	noi di "Gewichter ATT: " _col(20) `ATT_G0'*(1-`Gmean')+`ATT_G1'*`Gmean'
-	noi di "ATT:" _col(20) `ATT'
-	noi di "True ATT:" _col(20) `ATT_true'
-	noi di _n(1) "Note: in this ATT, two mechanisms operate:"
-	noi di _col(5) "1. effects on complying probability." 
-	noi di _col(5) "2. Effect on outcomes conditional on complying probability"
+	loc LATE =_b[D]
+	noi di "weighted LATE: " _col(20) `weightedLATE'
+	noi di "LATE:" _col(20) `LATE'
+	noi di "True LATE:" _col(20) `LATE_true'
+	noi di _n(1) "Note: in this LATE, two mechanisms operate:"
+	noi di _col(5) "1. G affects who are the compliers are (measured in terms of U_D, referred to as selection effect)." 
+	noi di _col(5) "2. G affecs the outcomes differently (for the same individuals, i.e. conditional on U{sub:D})"
 	noi di _n(1) _col(3) "==> Now we will decompose both effects..."
 	}
 
@@ -85,13 +97,11 @@ foreach varU of numlist .2 1{
 	foreach g of numlist 0 1{
 		su V if G==`g'
 		replace U_D =normal(-(V-`r(mean)')/`r(sd)') if G==`g'
-		su ITE if D==1 &G==`g'
+		su ITE if D==1 &G==`g' &comp==1
 		glo mATT`g' =`r(mean)'
 		su comp if G==`g'
 		glo comp`g' =`r(mean)'
 	}
-	noi di "1. Difference in complying probability is:"
-	noi di _col(5) abs($comp1-$comp0)
 	}
 
 	**# Efefct decomposition
@@ -104,9 +114,6 @@ foreach varU of numlist .2 1{
 	la var MTE1 "MTE, G=1" 
 	la var MTE0 "MTE, G=0"
     
-	
-
-
 	lpoly comp U_D if G==0, gen(wLATE0) at(eval) nogr
 	lpoly comp U_D if G==1, gen(wLATE1) at(eval) nogr
 
@@ -120,44 +127,83 @@ foreach varU of numlist .2 1{
 	la var LATE0 "LATE, G=0"
 	
 	la var eval "U{sub:D}"
-	gen MTElab ="True Outcome Effect" if _n==50
-	replace MTElab ="IV estimate of Outcome Effect" if _n==10 
-	gen eval1 =eval if inlist(_n,10,50)
-	gen mean =(MTE1+MTE0)/2 if _n==50
+	
+	qui{ // Determine evaluation points 
+	su eval if wLATE1>0
+	loc evalmin1 =`r(min)'
+	loc evalmax1 =`r(max)'
+	su eval if wLATE0>0
+	loc evalmin0 =`r(min)'
+	loc evalmax0 =`r(max)'
+	local evalmean =floor((min(`evalmin0',`evalmin1')+max(`evalmax0',`evalmax1'))/2*100)
+	di `evalmean'
+	
+	if abs(50-`evalmean')<20	loc ev2 =10
+	else 						loc ev2 =50
+	}
+	
+	local TrueGEtext 	"True G x E interaction"
+	local IVGEtext 		"IV estimate of G x E interaction"
+	gen 	MTElab ="`TrueGEtext'" 	if _n==`ev2'
+	replace MTElab ="`IVGEtext'" 	if _n==`evalmean'
+	gen mean =(MTE1+MTE0)/2 if _n==`ev2'
 	su LATE1
 	loc LATE1 =`r(mean)'
 	su LATE0
 	loc LATE0 =`r(mean)'
-	replace mean =(`LATE1'+`LATE0')/2 if _n==10
-	gen effect1 =MTE1 if _n==50 
-	replace effect1 =`LATE1' if _n==10
-	gen effect0 =MTE0 if _n==50
-	replace effect0 =`LATE0' if _n==10
+	di "inlist(_n,`evalmean',`ev2')"
+	gen eval1 =eval if inlist(_n,`evalmean',`ev2')
+	replace mean =(`LATE1'+`LATE0')/2 if _n==`evalmean'
+	gen effect1 =MTE1 if _n==`ev2'
+	replace effect1 =`LATE1' if _n==`evalmean'
+	gen effect0 =MTE0 if _n==`ev2'
+	replace effect0 =`LATE0' if _n==`evalmean'
 
-	tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lp(dot =) lc(blue red)) (rcap effect? eval1, mlab(MTElab)) (sc mean eval1, mlab(MTElab) msize(0)), plotr(lc(none)) legend( order(1 3 7 2 4 8) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") title("{&sigma}{sub:U}=`varU'")
+	tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lp(dot =) lc(blue red)) (rcap effect? eval1, mlab(MTElab)) (sc mean eval1, mlab(MTElab) msize(0)), plotr(lc(none)) legend( order(1 3 7 2 4 8) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") /*title("{&sigma}{sub:U}=`varU'")*/
 	gr export "Simulation_results_`=`varU'*10'.pdf", replace 
-
+	
+	
+	qui{ // Bar Plot to visualize effect sizes
+		gen deffect =effect1-effect0
+		la var deffect "Effect size"
+		gen mideffect =mi(deffect)
+		bys mideffect: gen bareval =_n if mideffect==0
+		sort eval
+		su bareval if MTElab=="`TrueGEtext'"
+		loc evalOutEff =`r(mean)'
+		su bareval if MTElab=="`IVGEtext'"
+		loc evalIVEff =`r(mean)'
+		su deffect
+		tw (bar deffect bareval, barw(.75) col(black)), ylabel(0 `=ceil(`r(min)')') yline(0) xlabel(`evalOutEff' "`TrueGEtext'" `evalIVEff' "`IVGEtext'") xtitle("") plotr(lc(none)) 
+		gr di, xsize(2.5) name(bar`=`varU'*10', replace)
+		gr export "Effect_comparison_`=`varU'*10'.pdf", replace 
+	}
 	gen dMTE =MTE1 - MTE0 
 	su dMTE
 	glo outcome_effect =`r(mean)'
-	noi di "Outcome effect: "$outcome_effect
-	di  $mATT1 - $mATT0
-	bys G: ivregress 2sls Y (D=Z) 
+	
+	noi di "1. Outcome effect: " _col(21)$outcome_effect
+	noi di "2. Selection effect: "_col(21)`LATE' -$outcome_effect
+	noi di _col(5) "(Difference in complying probability is: `=round(abs($comp1-$comp0),.0001)')"
+// 	di  $mATT1 - $mATT0
+	noi di _n(1) "G x E model is:"
+	noi di _col(5) "ivregress 2sls Y (D 1.D#1.G=Z 1.Z#1.G) 1.G"
+	noi di _n(1) "`IVGEtext' is" 
+	noi di _col(5) "_b[1.D#1.G]"
 }
-
-grc1leg Gr2 Gr10, name(combined, replace) ycommon
+exit
+gen ZG1 =Z*G
+ivregress 2sls Y (D 1.D#1.G=Z 1.Z#1.G) 1.G
+grc1leg Gr40 bar40, name(combined, replace) 
 gr di combined, ysize(3) xsize(6) scale(1.2)
 gr export "Simulation_results.pdf", replace 
-reg Y D 
-
-su V if D==1
 
 ********************************************************************************
 
 *save file online on github (cd muss immer lokal auf den github ordner eingestellt sein)
 file close _all
 file open git using mygit.bat, write replace 
-file write git config --global user.name Matthias Westphal
+file write git "git config --global user.name Matthias Westphal"
 file write git "git remote add origin " `"""' "hhttps://github.com/matwestp/GeneEnvironmentSimulation.git" `"""' _n
 file write git "git add --all" _n
 file write git "git commit -m "
