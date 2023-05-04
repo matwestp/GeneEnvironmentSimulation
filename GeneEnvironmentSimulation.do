@@ -228,7 +228,7 @@ gr di combined, ysize(3) xsize(6) scale(1.2)
 gr export "Simulation_results.pdf", replace 
 
 ********************************************************************************
-
+da
 *synchronize file 
 file close _all
 file open git using mygit.bat, write replace 
