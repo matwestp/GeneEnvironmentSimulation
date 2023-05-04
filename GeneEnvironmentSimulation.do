@@ -15,7 +15,8 @@ qui foreach varU of numlist 4{
 	drawnorm eps0 eps1, corr(C)
 
 	//Endowment (Genes)
-	gen 	G =eps0>0 								// Leute mit positiven (unbeobachteten) Y-Werten haben gute Gene corr(eps0,eps1)>0
+// 	gen 	G =eps0>0 
+gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben gute Gene corr(eps0,eps1)>0
 	la var 	G "Advantageous genetic environment"
 
 	
@@ -195,7 +196,7 @@ qui foreach varU of numlist 4{
 		su bareval if MTElab=="`IVGEtext'"
 		loc evalIVEff =`r(mean)'
 		su deffect
-		tw (bar deffect bareval, barw(.75) col(black)), ylabel(0 `=ceil(`r(min)')') yline(0) xlabel(`evalOutEff' "`TrueGEtext'" `evalIVEff' "`IVGEtext'") xtitle("") plotr(lc(none)) 
+		tw (bar deffect bareval, barw(.75) col(black)), ylabel(`=ceil(`r(min)')'(.5)`=ceil(`r(max)')') yline(0) xlabel(`evalOutEff' "`TrueGEtext'" `evalIVEff' "`IVGEtext'") xtitle("") plotr(lc(none)) 
 		gr di, xsize(2.5) name(bar`=`varU'*10', replace)
 		gr export "Effect_comparison_`=`varU'*10'.pdf", replace 
 	}
@@ -219,6 +220,18 @@ grc1leg Gr40 bar40, name(combined, replace)
 gr di combined, ysize(3) xsize(6) scale(1.2)
 gr export "Simulation_results.pdf", replace 
 
+gen ITE =Y1-Y0 
+gen comp =(D0==1)*(D1==0)
+
+bys G: su ITE if comp==1
+
+bys G: ivregress 2sls Y (D=Z)
+ ivregress 2sls Y (D=Z)
+
+ivregress 2sls Y (D 1.D#1.G=Z 1.Z#1.G) 1.G
+
+su MTE1 MTE0 dMTE
+gen dMTE =MTE1-MTE0
 ********************************************************************************
 
 *save file online on github (cd muss immer lokal auf den github ordner eingestellt sein)
