@@ -219,7 +219,7 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 	noi di _n(1) "`IVGEtext' is" 
 	noi di _col(5) "_b[1.D#1.G]"
 
-exit
+// exit
 
 gen ZG1 =Z*G
 ivregress 2sls Y (D 1.D#1.G=Z 1.Z#1.G) 1.G
@@ -229,15 +229,14 @@ gr export "Simulation_results.pdf", replace
 
 ********************************************************************************
 
-*save all files online on github 
+*synchronize file 
 file close _all
 file open git using mygit.bat, write replace 
-file write git "git config --global user.name Matthias Westphal"
 file write git "git remote add origin " `"""' "https://github.com/matwestp/GeneEnvironmentSimulation.git" `"""' _n
-file write git "git add --all" _n
-file write git "git commit -m "
-file write git `"""' "change" `"""' _n 			// choose name for change 
-file write git "git push" _n
+ file write git "git add --all" _n
+ file write git "git commit -m "
+ file write git `"""' "change" `"""' _n 			// choose name for change 
+ file write git "git push" _n
 file close git
 
 ! mygit.bat
