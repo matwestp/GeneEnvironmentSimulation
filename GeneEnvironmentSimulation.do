@@ -233,7 +233,7 @@ gr export "Simulation_results.pdf", replace
 file close _all
 file open git using mygit.bat, write replace 
 file write git "git config --global user.name Matthias Westphal"
-file write git "git remote add origin " `"""' "hhttps://github.com/matwestp/GeneEnvironmentSimulation.git" `"""' _n
+file write git "git remote add origin " `"""' "https://github.com/matwestp/GeneEnvironmentSimulation.git" `"""' _n
 file write git "git add --all" _n
 file write git "git commit -m "
 file write git `"""' "change" `"""' _n 			// choose name for change 
