@@ -3,8 +3,8 @@
 cd "C:\Users\Win7ADM\Documents\GitHub\GeneEnvironmentSimulation"
 
 *******************************************************************************
-qui foreach varU of numlist 4{
-// 	local varU =1
+
+	local varU =4
 	clear 
 	set obs 100000
 
@@ -52,7 +52,7 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 	bys G: su comp 
 
 	//Observation rule 
-	gen Y =Y0 +D*(Y1-Y0) +0*G
+	gen Y =Y0 +D*(Y1-Y0)
 	// OLS is biased because cov(eps0,D)!=0
 	// IV is unbiased because cov(eps0,Z)==0
 	*********************************************************************
@@ -60,7 +60,7 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 	**# Analyzing Variables 
 
 
-	qui{ // Theorem IV weights (Loken, Mogstad, Wiswall, 2012 AEJ:Applied)
+	qui{ // Theorem IV weights (Loken, Mogstad, Wiswall, 2012 AEJ:Applied) --- Answers the question of what weight the sub-LATEs in G=1 and G=0 receive for the overall LATE
 	ivregress 2sls Y (D=Z)  if G==0
 	loc LATE_G0 =_b[D]
 	ivregress 2sls Y (D=Z) if G==1
@@ -92,7 +92,7 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 
 
 	qui{
-	gen V =ITE 
+	gen V =ITE // In the case of control variables, one need to fix them as U_D varies 
 	la var V "unobserved gains"
 	gen U_D =. 
 	foreach g of numlist 0 1{
@@ -109,7 +109,7 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 
 	gen eval =_n/100 if _n<=100 
 	
-	qui{ // Estimate the weights. Theorem IV weights (Loken, Mogstad, Wiswall, 2012 AEJ:Applied)
+	qui{ // Estimate the weights. Theorem IV weights (Loken, Mogstad, Wiswall, 2012 AEJ:Applied) --- Answers the question of what weight the sub-LATEs in each U_D bin receive for the overall LATE by G 
 			cap drop wG? 
 		foreach g of numlist 0 1{
 			gen wG`g' =. 
@@ -126,19 +126,21 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 		}
 	}	
 
-
+//	Estimate/compute the true MTEs 
 	lpoly V U_D if G==1, gen(MTE1) at(eval) nogr
 	lpoly V U_D if G==0, gen(MTE0) at(eval) nogr
 
 	la var MTE1 "MTE, G=1" 
 	la var MTE0 "MTE, G=0"
     
+//	Estimate the complier weights 
 	lpoly comp U_D if G==0, gen(wLATE0) at(eval) nogr
 	lpoly comp U_D if G==1, gen(wLATE1) at(eval) nogr
 
 	la var wLATE0 "{&omega}{sub:LATE}, G=0"
 	la var wLATE1 "{&omega}{sub:LATE}, G=1"
 
+//	the lines for the LATE
 	gen LATE1 =$mATT1 if !mi(eval) &wLATE1>0
 	gen LATE0 =$mATT0 if !mi(eval) &wLATE0>0
 	
@@ -147,7 +149,7 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 	
 	la var eval "U{sub:D}"
 	
-	qui{ // Determine evaluation points 
+	qui{ // Determine points at which to display the effects 
 	su eval if wLATE1>0
 	loc evalmin1 =`r(min)'
 	loc evalmax1 =`r(max)'
@@ -163,14 +165,17 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 	
 	local TrueGEtext 	"True G x E interaction"
 	local IVGEtext 		"IV estimate of G x E interaction"
+	
 	gen 	MTElab ="`TrueGEtext'" 	if _n==`ev2'
 	replace MTElab ="`IVGEtext'" 	if _n==`evalmean'
+	
 	gen mean =(MTE1+MTE0)/2 if _n==`ev2'
 	su LATE1
 	loc LATE1 =`r(mean)'
 	su LATE0
 	loc LATE0 =`r(mean)'
 	di "inlist(_n,`evalmean',`ev2')"
+	
 	gen eval1 =eval if inlist(_n,`evalmean',`ev2')
 	replace mean =(`LATE1'+`LATE0')/2 if _n==`evalmean'
 	gen effect1 =MTE1 if _n==`ev2'
@@ -181,6 +186,7 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 	tw (li wG0 eval) (li wLATE0 eval, yaxis(2))
 	tw (li wG1 eval) (li wLATE1 eval, yaxis(2))
 	
+//	MTE plot: 
 	tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lp(dot =) lc(blue red)) (rcap effect? eval1, mlab(MTElab)) (sc mean eval1, mlab(MTElab) msize(0)), plotr(lc(none)) legend( order(1 3 7 2 4 8) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") /*title("{&sigma}{sub:U}=`varU'")*/
 	gr export "Simulation_results_`=`varU'*10'.pdf", replace 
 	
@@ -212,29 +218,18 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 	noi di _col(5) "ivregress 2sls Y (D 1.D#1.G=Z 1.Z#1.G) 1.G"
 	noi di _n(1) "`IVGEtext' is" 
 	noi di _col(5) "_b[1.D#1.G]"
-}
+
 exit
+
 gen ZG1 =Z*G
 ivregress 2sls Y (D 1.D#1.G=Z 1.Z#1.G) 1.G
 grc1leg Gr40 bar40, name(combined, replace) 
 gr di combined, ysize(3) xsize(6) scale(1.2)
 gr export "Simulation_results.pdf", replace 
 
-gen ITE =Y1-Y0 
-gen comp =(D0==1)*(D1==0)
-
-bys G: su ITE if comp==1
-
-bys G: ivregress 2sls Y (D=Z)
- ivregress 2sls Y (D=Z)
-
-ivregress 2sls Y (D 1.D#1.G=Z 1.Z#1.G) 1.G
-
-su MTE1 MTE0 dMTE
-gen dMTE =MTE1-MTE0
 ********************************************************************************
 
-*save file online on github (cd muss immer lokal auf den github ordner eingestellt sein)
+*save all files online on github 
 file close _all
 file open git using mygit.bat, write replace 
 file write git "git config --global user.name Matthias Westphal"
