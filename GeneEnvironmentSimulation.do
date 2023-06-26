@@ -1,7 +1,8 @@
 //Simulation für das Gene Paper: Interaktion zwischen beobachteter und unbeobachteter Heterogenität
 
 cd "C:\Users\Win7ADM\Documents\GitHub\GeneEnvironmentSimulation"
-
+graph set window fontface "Century"
+set scheme plotplainblind
 *******************************************************************************
 
 	local varU =4
@@ -147,7 +148,7 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 	la var LATE1 "LATE, G=1"
 	la var LATE0 "LATE, G=0"
 	
-	la var eval "U{sub:D}"
+	la var eval "U{sub:E}"
 	
 	qui{ // Determine points at which to display the effects 
 	su eval if wLATE1>0
@@ -182,13 +183,33 @@ gen G =rnormal()>0								// Leute mit positiven (unbeobachteten) Y-Werten haben
 	replace effect1 =`LATE1' if _n==`evalmean'
 	gen effect0 =MTE0 if _n==`ev2'
 	replace effect0 =`LATE0' if _n==`evalmean'
-	
-	tw (li wG0 eval) (li wLATE0 eval, yaxis(2))
-	tw (li wG1 eval) (li wLATE1 eval, yaxis(2))
-	
+	colorpalette plottig
+//  ananas sky turquoise reddish vermillion sea orangebrown
+// 	tw (area wG0 eval, col("97 156 255 %30")) (area wLATE0 eval, yaxis(2) col("0 176 246 %30"))
+// 	tw (li wG1 eval) (li wLATE1 eval, yaxis(2))
+	global col1 "97 156 255"
+// 	global col2 "0 176 246"
+// 	global col1 "0 188 216"
+	global col2 "0 192 175"
 //	MTE plot: 
-	tw (li MTE1 MTE0 eval, lc(blue red) lw(.6 =)) (li wLATE1 wLATE0 eval, lp(dash =) yaxis(2) lc(blue red)) (li LATE1 LATE0 eval, lw(1 =) lp(dot =) lc(blue red)) (rcap effect? eval1, mlab(MTElab)) (sc mean eval1, mlab(MTElab) msize(0)), plotr(lc(none)) legend( order(1 3 7 2 4 8) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") /*title("{&sigma}{sub:U}=`varU'")*/
-	gr export "Simulation_results_`=`varU'*10'.pdf", replace 
+//Presentation, slide 1
+	tw (li MTE1 MTE0 eval, lc("$col1" none) lw(.6 =)) (area wLATE1 wLATE0 eval, lp(dash =) yaxis(2) col(none =)) (li LATE1 LATE0 LATE1 LATE0 eval, lw(1 = = =) lp(solid = dot =) lc(none = = = )) (rcap effect? eval1, mlab(MTElab) col(none =)) (sc mean eval1, mlab(MTElab) msize(0)  mlabcol(none =)), plotr(lc(none)) legend(pos(6) order(1 3 9 2 4 10) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") /*title("{&sigma}{sub:U}=`varU'")*/
+	gr export "Setting_1.pdf", replace 
+//	slide 2
+	tw (li MTE1 MTE0 eval, lc("$col1" "$col2") lw(.6 =)) (area wLATE1 wLATE0 eval, lp(dash =) yaxis(2) col(none =)) (li LATE1 LATE0 LATE1 LATE0 eval, lw(1 = = =) lp(solid = dot =) lc(none = = = )) (rcap effect? eval1, mlab(MTElab) col(none =)) (sc mean eval1, mlab(MTElab) msize(0)  mlabcol(none =)), plotr(lc(none)) legend(pos(6) order(1 3 9 2 4 10) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") /*title("{&sigma}{sub:U}=`varU'")*/
+	gr export "Setting_2.pdf", replace 
+//	slide 3
+	tw (li MTE1 MTE0 eval, lc("$col1" "$col2") lw(.6 =)) (area wLATE1 wLATE0 eval, lp(dash =) yaxis(2) col(none =)) (li LATE1 LATE0 LATE1 LATE0 eval, lw(1 = = =) lp(solid = dot =) lc(none = = = )) (rcap effect0 effect1 eval1 if _n==10, col(black) mlab(MTElab)) (sc mean eval1 if _n==10, mlab(MTElab) msize(0)  mlabcol(black none)), plotr(lc(none)) legend(pos(6) order(1 3 9 2 4 10) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") /*title("{&sigma}{sub:U}=`varU'")*/
+	gr export "Setting_3.pdf", replace 
+//	slide 4 
+	tw (li MTE1 MTE0 eval, lc("$col1" "$col2") lw(.6 =)) (area wLATE1 wLATE0 eval, lp(dash =) yaxis(2) col("$col1 %50" none)) (li LATE1 LATE0 LATE1 LATE0 eval, lw(1 = = =) lp(solid = dot =) lc("$col1 %50"  none black none)) (rcap effect0 effect1 eval1 if _n==10, col(black) mlab(MTElab)) (sc mean eval1 if _n==10, mlab(MTElab) msize(0)  mlabcol(black none)), plotr(lc(none)) legend(pos(6) order(1 3 9 2 4 10) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") /*title("{&sigma}{sub:U}=`varU'")*/
+	gr export "Setting_4.pdf", replace 
+//	slide 5 
+	tw (li MTE1 MTE0 eval, lc("$col1" "$col2") lw(.6 =)) (area wLATE1 wLATE0 eval, lp(dash =) yaxis(2) col("$col1 %50" "$col2 %50")) (li LATE1 LATE0 LATE1 LATE0 eval, lw(1 = = =) lp(solid = dot =) lc("$col1 %50"  "$col2 %50" black =)) (rcap effect0 effect1 eval1 if _n==10, col(black) mlab(MTElab)) (sc mean eval1 if _n==10, mlab(MTElab) msize(0)  mlabcol(black none)), plotr(lc(none)) legend(pos(6) order(1 3 9 2 4 10) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") /*title("{&sigma}{sub:U}=`varU'")*/
+	gr export "Setting_4.pdf", replace 
+	
+	tw (li MTE1 MTE0 eval, lc("$col1" "$col2") lw(.6 =)) (area wLATE1 wLATE0 eval, lp(dash =) yaxis(2) col("$col1 %50" "$col2 %50")) (li LATE1 LATE0 LATE1 LATE0 eval, lw(1 = = =) lp(solid = dot =) lc("$col1" "$col2")) (rcap effect? eval1, mlab(MTElab)) (sc mean eval1, mlab(MTElab) msize(0)), plotr(lc(none)) legend(pos(6) order(1 3 9 2 4 10) cols(3)) ytitle("`Pr(Complier)'", axis(2)) ytitle("Effect") name(Gr`=`varU'*10', replace) xtitle("`:var label eval'") /*title("{&sigma}{sub:U}=`varU'")*/
+	gr export "Setting_final.pdf", replace 
 	
 	
 	qui{ // Bar Plot to visualize effect sizes
